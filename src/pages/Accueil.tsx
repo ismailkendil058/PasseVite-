@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueue, QueueEntry } from '@/hooks/useQueue';
 import { Button } from '@/components/ui/button';
@@ -9,20 +9,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Phone, Plus, LogOut, Search, ChevronRight, Users, Clock, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
+import { Phone, Plus, LogOut, ChevronRight, ChevronLeft, Users, Clock, CheckCircle, XCircle, MessageCircle, Pencil, Trash2 } from 'lucide-react';
 
 const TREATMENTS = ['Consultation', 'Blanchiment', 'Extraction', 'Détartrage', 'Soin dentaire', 'Prothèse', 'Orthodontie'];
 
 const Accueil = () => {
   const { user, signOut } = useAuth();
-  const { entries, activeSession, doctors, openSession, closeSession, addClient, completeClient, getStats } = useQueue();
+  const { entries, activeSession, doctors, openSession, closeSession, addClient, completeClient, getStats, updateClient, deleteClient } = useQueue();
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<QueueEntry | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [editEntry, setEditEntry] = useState<QueueEntry | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editState, setEditState] = useState<'U' | 'N' | 'R'>('N');
+  const [editDoctorId, setEditDoctorId] = useState('');
   const [doctorFilter, setDoctorFilter] = useState<string>('all');
+  const doctorsScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollDoctors = (direction: 'left' | 'right') => {
+    if (doctorsScrollRef.current) {
+      const scrollAmount = 150;
+      doctorsScrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Add client form
   const [newPhone, setNewPhone] = useState('');
@@ -97,6 +112,37 @@ const Accueil = () => {
     }
   };
 
+  const handleEdit = (entry: QueueEntry) => {
+    setEditEntry(entry);
+    setEditPhone(entry.phone);
+    setEditState(entry.state);
+    setEditDoctorId(entry.doctor_id);
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editEntry || !editPhone.trim() || !editDoctorId) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+    const { error } = await updateClient(editEntry.id, {
+      phone: editPhone.trim(),
+      state: editState,
+      doctor_id: editDoctorId,
+    });
+    if (error) toast.error('Erreur lors de la modification');
+    else {
+      toast.success('Client modifié avec succès');
+      setShowEditModal(false);
+    }
+  };
+
+  const handleDelete = async (entryId: string) => {
+    const { error } = await deleteClient(entryId);
+    if (error) toast.error('Erreur lors de la suppression');
+    else toast.success('Client supprimé');
+  };
+
   const fetchCompleted = async () => {
     if (!activeSession) return;
     const { data } = await (await import('@/integrations/supabase/client')).supabase
@@ -109,9 +155,8 @@ const Accueil = () => {
   };
 
   const filtered = entries.filter(e => {
-    const matchesSearch = !searchQuery || e.phone.includes(searchQuery) || e.client_id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDoctor = doctorFilter === 'all' || e.doctor_id === doctorFilter;
-    return matchesSearch && matchesDoctor;
+    return matchesDoctor;
   });
 
   const stateColors = {
@@ -195,42 +240,50 @@ const Accueil = () => {
         </div>
       </header>
 
-      {/* Stats by Doctor - scrollable on mobile */}
-      <div className="flex gap-2 p-3 sm:p-4 overflow-x-auto sm:grid sm:grid-cols-4 sm:overflow-visible">
-        {doctors.map(doctor => {
-          const waiting = entries.filter(e => e.doctor_id === doctor.id);
-          return (
-            <Card key={doctor.id} className="border-0 shadow-sm shrink-0 w-28 sm:w-auto">
-              <CardContent className="p-3 sm:p-4 text-center">
-                <p className="text-xs font-medium text-muted-foreground mb-1 truncate">Dr. {doctor.name}</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground">{waiting.length}</p>
-                <p className="text-xs text-muted-foreground">en attente</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Search & Filter */}
-      <div className="px-3 sm:px-4 flex gap-2">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-9 sm:h-10"
-          />
+      {/* Stats by Doctor - carousel with navigation */}
+      <div className="relative">
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 bg-background/80 shadow-md rounded-full"
+            onClick={() => scrollDoctors('left')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
         </div>
-        <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-          <SelectTrigger className="w-24 sm:w-32 h-9 sm:h-10"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
-            {doctors.map(d => (
-              <SelectItem key={d.id} value={d.id}>Dr. {d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 bg-background/80 shadow-md rounded-full"
+            onClick={() => scrollDoctors('right')}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div 
+          ref={doctorsScrollRef}
+          className="flex gap-2 p-3 sm:p-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {doctors.map(doctor => {
+            const waiting = entries.filter(e => e.doctor_id === doctor.id);
+            return (
+              <Card 
+                key={doctor.id} 
+                className="border-0 shadow-sm shrink-0 w-28 sm:w-40 snap-start cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setDoctorFilter(doctorFilter === doctor.id ? 'all' : doctor.id)}
+              >
+                <CardContent className="p-3 sm:p-4 text-center">
+                  <p className="text-xs font-medium text-muted-foreground mb-1 truncate">Dr. {doctor.name}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground">{waiting.length}</p>
+                  <p className="text-xs text-muted-foreground">en attente</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       {/* Queue List */}
@@ -255,30 +308,65 @@ const Accueil = () => {
                         {stateLabels[entry.state]}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <a href={`tel:${entry.phone}`} className="text-xs sm:text-sm text-primary flex items-center gap-1">
-                        <Phone className="h-3 w-3 shrink-0" /> <span className="truncate">{entry.phone}</span>
-                      </a>
-                      <a
-                        href={`sms:${entry.phone}?body=${encodeURIComponent("Bonjour,\n\nIci la Clinique Nedjma. Nous vous informons que votre tour est prévu dans environ 30 minutes.\nNous vous remercions de bien vouloir vous présenter à l'accueil à temps.\n\nMerci pour votre compréhension et à tout à l'heure.\nClinique Nedjma")}`}
-                        className="text-primary hover:text-primary/80"
-                        title="Envoyer un SMS"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                      </a>
-                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       Dr. {entry.doctor?.name || '—'}
                     </p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleNext(entry)}
-                  className="gap-1 shrink-0 h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
-                >
-                  <span className="hidden sm:inline">Suivant</span> <ChevronRight className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1">
+                    <a href={`tel:${entry.phone}`} className="text-primary flex items-center justify-center p-1.5 hover:bg-secondary/50 rounded-full transition-colors" title="Appeler">
+                      <Phone className="h-5 w-5" />
+                    </a>
+                    <a
+                      href={`sms:${entry.phone}?body=${encodeURIComponent("Bonjour,\n\nIci la Clinique Nedjma. Nous vous informons que votre tour est prévu dans environ 30 minutes.\nNous vous remercions de bien vouloir vous présenter à l'accueil à temps.\n\nMerci pour votre compréhension et à tout à l'heure.\nClinique Nedjma")}`}
+                      className="text-primary flex items-center justify-center p-1.5 hover:bg-secondary/50 rounded-full transition-colors"
+                      title="Envoyer un SMS"
+                    >
+                      <MessageCircle className="h-5 w-5" />
+                    </a>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => handleEdit(entry)}
+                      title="Modifier"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer le client ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Cette action supprimera {entry.client_id} de la file d'attente. Cette action est irréversible.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(entry.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleNext(entry)}
+                    className="gap-1 shrink-0 h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                  >
+                    <span className="hidden sm:inline">Suivant</span> <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))
@@ -404,6 +492,43 @@ const Accueil = () => {
               ))
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le client · {editEntry?.client_id}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 sm:space-y-4">
+            <Input
+              placeholder="Numéro de téléphone"
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+              type="tel"
+              className="h-11 sm:h-12"
+            />
+            <Select value={editState} onValueChange={(v) => setEditState(v as 'U' | 'N' | 'R')}>
+              <SelectTrigger className="h-11 sm:h-12"><SelectValue placeholder="État" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="U">🔴 Urgence</SelectItem>
+                <SelectItem value="N">🟢 Nouveau</SelectItem>
+                <SelectItem value="R">🔵 Rendez-vous</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={editDoctorId} onValueChange={setEditDoctorId}>
+              <SelectTrigger className="h-11 sm:h-12"><SelectValue placeholder="Médecin" /></SelectTrigger>
+              <SelectContent>
+                {doctors.map(d => (
+                  <SelectItem key={d.id} value={d.id}>Dr. {d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleUpdate} className="w-full h-11 sm:h-12">Enregistrer</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

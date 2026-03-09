@@ -231,6 +231,22 @@ export function useQueue() {
     return stats;
   };
 
+  const updateClient = async (entryId: string, updates: { phone?: string; state?: 'U' | 'N' | 'R'; doctor_id?: string }) => {
+    const { error } = await supabase
+      .from('queue_entries')
+      .update(updates)
+      .eq('id', entryId);
+    return { error };
+  };
+
+  const deleteClient = async (entryId: string) => {
+    const { error } = await supabase
+      .from('queue_entries')
+      .delete()
+      .eq('id', entryId);
+    return { error };
+  };
+
   return {
     entries: entries.filter(e => e.status === 'waiting'),
     activeSession,
@@ -243,5 +259,7 @@ export function useQueue() {
     getStats,
     fetchEntries,
     fetchActiveSession,
+    updateClient,
+    deleteClient,
   };
 }
