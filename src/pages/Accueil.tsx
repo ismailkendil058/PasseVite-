@@ -9,13 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Phone, Plus, LogOut, ChevronRight, ChevronLeft, Users, Clock, CheckCircle, XCircle, MessageCircle, Pencil, Trash2 } from 'lucide-react';
+import { Phone, Plus, LogOut, ChevronRight, ChevronLeft, Users, Clock, CheckCircle, XCircle, MessageCircle, Pencil, Trash2, UserCheck } from 'lucide-react';
 
 const TREATMENTS = ['Consultation', 'Blanchiment', 'Extraction', 'Détartrage', 'Soin dentaire', 'Prothèse', 'Orthodontie'];
 
 const Accueil = () => {
   const { user, signOut } = useAuth();
-  const { entries, activeSession, doctors, openSession, closeSession, addClient, completeClient, getStats, updateClient, deleteClient } = useQueue();
+  const { entries, inCabinetEntries, activeSession, doctors, openSession, closeSession, addClient, callClient, completeClient, getStats, updateClient, deleteClient } = useQueue();
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -62,6 +62,16 @@ const Accueil = () => {
   };
 
   const handleCloseSession = async () => {
+    // Check if there are clients in waiting list or in-cabinet
+    if (entries.length > 0 || inCabinetEntries.length > 0) {
+      const waitingCount = entries.length;
+      const inCabinetCount = inCabinetEntries.length;
+      toast.error(
+        `Impossible de fermer la séance avec ${waitingCount + inCabinetCount} client(s) en attente (${waitingCount} en file d'attente, ${inCabinetCount} au cabinet)`
+      );
+      return;
+    }
+    
     const { error } = await closeSession();
     if (error) toast.error('Erreur lors de la fermeture de la séance');
     else toast.success('Séance fermée avec succès');
@@ -83,7 +93,18 @@ const Accueil = () => {
     }
   };
 
-  const handleNext = (entry: QueueEntry) => {
+  const handleNext = async (entry: QueueEntry) => {
+    // Call client - move from waiting to in_cabinet
+    const { error } = await callClient(entry.id);
+    if (error) {
+      toast.error('Erreur lors de l\'appel du client');
+    } else {
+      toast.success(`Client ${entry.client_id} appelé au cabinet`);
+    }
+  };
+
+  const handleCompleteClick = (entry: QueueEntry) => {
+    // Open completion form for in-cabinet client
     setSelectedEntry(entry);
     setClientName('');
     setTreatment('');
@@ -214,12 +235,12 @@ const Accueil = () => {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="hidden sm:flex">
+              <Button variant="destructive" size="sm" className="hidden sm:flex" disabled={entries.length > 0 || inCabinetEntries.length > 0}>
                 <XCircle className="h-4 w-4 mr-1" /> Fermer
               </Button>
             </AlertDialogTrigger>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" className="sm:hidden h-8 w-8">
+              <Button variant="destructive" size="icon" className="sm:hidden h-8 w-8" disabled={entries.length > 0 || inCabinetEntries.length > 0}>
                 <XCircle className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
@@ -227,12 +248,20 @@ const Accueil = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Fermer la séance ?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Cette action va fermer la séance actuelle. La file d'attente sera remise à zéro et l'écran TV sera réinitialisé.
+                  {entries.length > 0 || inCabinetEntries.length > 0 ? (
+                    <span className="text-destructive">
+                      Impossible de fermer la séance : {entries.length + inCabinetEntries.length} client(s) en attente 
+                      ({entries.length} en file d'attente, {inCabinetEntries.length} au cabinet). 
+                      Veuillez traiter ou supprimer tous les clients avant de fermer la séance.
+                    </span>
+                  ) : (
+                    'Cette action va fermer la séance actuelle. La file d\'attente sera remise à zéro et l\'écran TV sera réinitialisé.'
+                  )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction onClick={handleCloseSession}>Confirmer</AlertDialogAction>
+                <AlertDialogAction onClick={handleCloseSession} disabled={entries.length > 0 || inCabinetEntries.length > 0}>Confirmer</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -285,6 +314,31 @@ const Accueil = () => {
           })}
         </div>
       </div>
+
+      {/* In Cabinet Section */}
+      {inCabinetEntries.length > 0 && (
+        <div className="p-3 sm:p-4 pb-0">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-orange-500" />
+            Au cabinet ({inCabinetEntries.length})
+          </h2>
+          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+            {inCabinetEntries.map(entry => (
+              <Card 
+                key={entry.id}
+                className="border-orange-200 bg-orange-50 shrink-0 w-40 sm:w-48 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleCompleteClick(entry)}
+              >
+                <CardContent className="p-3 text-center">
+                  <p className="font-bold text-lg text-orange-700">{entry.client_id}</p>
+                  <p className="text-xs text-orange-600 truncate">Dr. {entry.doctor?.name || '—'}</p>
+                  <p className="text-xs text-orange-500 mt-1">Cliquer pour finaliser</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Queue List */}
       <div className="flex-1 p-3 sm:p-4 space-y-2 pb-24">

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Clock, Search } from 'lucide-react';
+import { Users, Clock, Search, AlertCircle } from 'lucide-react';
 
 interface QueueData {
   client_id: string;
@@ -94,11 +94,17 @@ const Client = () => {
     }
 
     const idx = sorted.findIndex(e => e.id === entry!.id);
+    
+    // Count people before this client waiting for the SAME doctor
+    const peopleBeforeSameDoctor = sorted.slice(0, idx).filter(
+      e => e.doctor_id === entry!.doctor_id
+    ).length;
+    
     setQueueData({
       client_id: entry.client_id,
       state: entry.state,
       position: idx + 1,
-      peopleBefore: idx,
+      peopleBefore: peopleBeforeSameDoctor,
       doctor_name: (entry as any).doctor?.name || '',
       found: true,
     });
@@ -190,11 +196,20 @@ const Client = () => {
       )}
 
       {queueData && !queueData.found && (
-        <div className="p-3 sm:p-4 text-center">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-6 sm:p-8">
-              <p className="text-muted-foreground text-sm sm:text-base">Aucun client trouvé. Vérifiez vos informations.</p>
-              <Button variant="outline" className="mt-4" onClick={() => setQueueData(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm border-0 shadow-xl">
+            <CardContent className="p-6 sm:p-8 text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="h-8 w-8 text-red-600" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg sm:text-xl font-semibold text-red-600">Aucun client trouvé</p>
+                <p className="text-sm text-muted-foreground">Vérifiez vos informations et réessayez.</p>
+                <p className="text-xs text-muted-foreground">Assurez-vous que votre numéro de téléphone ou votre identifiant est correct.</p>
+              </div>
+              <Button variant="destructive" onClick={() => setQueueData(null)} className="mt-2">
                 Réessayer
               </Button>
             </CardContent>

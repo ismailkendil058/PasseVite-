@@ -11,7 +11,7 @@ export interface QueueEntry {
   state_number: number;
   client_id: string;
   position: number;
-  status: string;
+  status: 'waiting' | 'in_cabinet' | 'completed';
   created_at: string;
   doctor?: { name: string; initial: string };
 }
@@ -32,6 +32,7 @@ const PRIORITY_ORDER = { U: 0, N: 1, R: 2 };
 
 export function useQueue() {
   const [entries, setEntries] = useState<QueueEntry[]>([]);
+  const [inCabinetEntries, setInCabinetEntries] = useState<QueueEntry[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +67,18 @@ export function useQueue() {
     }
   }, []);
 
+  const fetchInCabinetEntries = useCallback(async (sessionId: string) => {
+    const { data } = await supabase
+      .from('queue_entries')
+      .select('*, doctor:doctors(*)')
+      .eq('session_id', sessionId)
+      .eq('status', 'in_cabinet')
+      .order('created_at', { ascending: true });
+    if (data) {
+      setInCabinetEntries(data as QueueEntry[]);
+    }
+  }, []);
+
   const sortByPriority = (items: QueueEntry[]) => {
     return [...items].sort((a, b) => {
       const pa = PRIORITY_ORDER[a.state as keyof typeof PRIORITY_ORDER] ?? 99;
@@ -79,11 +92,14 @@ export function useQueue() {
     const init = async () => {
       await fetchDoctors();
       const session = await fetchActiveSession();
-      if (session) await fetchEntries(session.id);
+      if (session) {
+        await fetchEntries(session.id);
+        await fetchInCabinetEntries(session.id);
+      }
       setLoading(false);
     };
     init();
-  }, [fetchDoctors, fetchActiveSession, fetchEntries]);
+  }, [fetchDoctors, fetchActiveSession, fetchEntries, fetchInCabinetEntries]);
 
   // Real-time subscription
   useEffect(() => {
@@ -96,12 +112,13 @@ export function useQueue() {
         { event: '*', schema: 'public', table: 'queue_entries', filter: `session_id=eq.${activeSession.id}` },
         (_payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           fetchEntries(activeSession.id);
+          fetchInCabinetEntries(activeSession.id);
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [activeSession, fetchEntries]);
+  }, [activeSession, fetchEntries, fetchInCabinetEntries]);
 
   // Session real-time
   useEffect(() => {
@@ -141,7 +158,17 @@ export function useQueue() {
     if (!error) {
       setActiveSession(null);
       setEntries([]);
+      setInCabinetEntries([]);
     }
+    return { error };
+  };
+
+  // Call client - move from waiting to in_cabinet
+  const callClient = async (entryId: string) => {
+    const { error } = await supabase
+      .from('queue_entries')
+      .update({ status: 'in_cabinet' })
+      .eq('id', entryId);
     return { error };
   };
 
@@ -189,7 +216,8 @@ export function useQueue() {
     tranchePaid: number,
     receptionistId: string
   ) => {
-    const entry = entries.find(e => e.id === entryId);
+    // Find entry from either waiting or in_cabinet list
+    const entry = entries.find(e => e.id === entryId) || inCabinetEntries.find(e => e.id === entryId);
     if (!entry || !activeSession) return { error: new Error('Entrée introuvable') };
 
     // Insert completed record
@@ -249,15 +277,18 @@ export function useQueue() {
 
   return {
     entries: entries.filter(e => e.status === 'waiting'),
+    inCabinetEntries,
     activeSession,
     doctors,
     loading,
     openSession,
     closeSession,
     addClient,
+    callClient,
     completeClient,
     getStats,
     fetchEntries,
+    fetchInCabinetEntries,
     fetchActiveSession,
     updateClient,
     deleteClient,
