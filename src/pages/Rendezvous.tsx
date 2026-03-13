@@ -50,7 +50,8 @@ interface Doctor {
 }
 
 const Rendezvous = () => {
-    const { signOut } = useAuth();
+    useAuth();
+
     const [clients, setClients] = useState<CompletedClient[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -112,11 +113,12 @@ const Rendezvous = () => {
         const patientData = new Map<string, { latest: CompletedClient, totalPaid: number }>();
 
         clients.forEach(c => {
-            const existing = patientData.get(c.phone);
+            const key = `${c.phone}_${c.client_name.toLowerCase().trim()}_${(c.treatment || '').toLowerCase().trim()}`;
+            const existing = patientData.get(key);
             const currentPaid = c.tranche_paid || 0;
 
             if (!existing) {
-                patientData.set(c.phone, { latest: c, totalPaid: currentPaid });
+                patientData.set(key, { latest: c, totalPaid: currentPaid });
             } else {
                 // Keep the record with the most recent completion date as 'latest'
                 const isNewer = new Date(c.completed_at) > new Date(existing.latest.completed_at);
@@ -128,21 +130,15 @@ const Rendezvous = () => {
         });
 
         return Array.from(patientData.values())
-            .filter(({ latest, totalPaid }) => {
-                const total = latest.total_amount || 0;
-                // Only hide if total > 0 (it's a real treatment) and it's fully paid
-                // If total is 0, we might still want to see them? 
-                // Usually, if they paid everything for their last treatment, they disappear.
-                return totalPaid < total || total === 0;
-            })
-            .map(d => d.latest)
+            .map(d => ({ ...d.latest, totalPaid: d.totalPaid }))
             .sort((a, b) => a.client_name.localeCompare(b.client_name));
     }, [clients]);
 
     const filteredClients = useMemo(() => {
         return uniqueClients.filter(c =>
             c.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.phone.includes(searchQuery)
+            c.phone.includes(searchQuery) ||
+            (c.treatment || '').toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [uniqueClients, searchQuery]);
 
@@ -266,9 +262,13 @@ const Rendezvous = () => {
         setIsScheduleOpen(true);
     };
 
-    const getClientHistory = (phone: string) => {
-        const history = clients.filter(c => c.phone === phone);
-        const appts = appointments.filter(a => a.client_phone === phone);
+    const getClientHistory = (phone: string, name: string, treatment: string) => {
+        const history = clients.filter(c =>
+            c.phone === phone &&
+            c.client_name.toLowerCase().trim() === name.toLowerCase().trim() &&
+            (c.treatment || '').toLowerCase().trim() === treatment.toLowerCase().trim()
+        );
+        const appts = appointments.filter(a => a.client_phone === phone && a.client_name.toLowerCase().trim() === name.toLowerCase().trim());
         return { history, appts };
     };
 
@@ -288,7 +288,7 @@ const Rendezvous = () => {
                     <Button variant="ghost" size="icon" onClick={() => window.location.href = '/manager'} className="h-9 w-9">
                         <History className="h-5 w-5" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={signOut} className="h-9 w-9">
+                    <Button variant="ghost" size="icon" onClick={() => window.location.href = '/accueil'} className="h-9 w-9">
                         <LogOut className="h-5 w-5" />
                     </Button>
                 </div>
@@ -409,13 +409,13 @@ const Rendezvous = () => {
                                     <p className="text-center py-10 text-muted-foreground">Aucun patient trouvé</p>
                                 ) : (
                                     filteredClients.map(client => (
-                                        <Dialog key={client.phone}>
+                                        <Dialog key={`${client.phone}_${client.client_name}_${client.treatment}`}>
                                             <DialogTrigger asChild>
                                                 <Card className="cursor-pointer hover:border-primary/30 hover:bg-primary/[0.02] transition-all group">
                                                     <CardContent className="p-4 flex items-center justify-between">
                                                         <div className="space-y-1">
                                                             <p className="font-bold text-foreground group-hover:text-primary transition-colors">{client.client_name}</p>
-                                                            <p className="text-xs text-muted-foreground">{client.phone}</p>
+                                                            <p className="text-xs text-muted-foreground">{client.phone} · <span className="text-primary/70">{client.treatment}</span></p>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             <div className="text-right hidden sm:block">
@@ -461,7 +461,7 @@ const Rendezvous = () => {
                                                                     </TableRow>
                                                                 </TableHeader>
                                                                 <TableBody>
-                                                                    {getClientHistory(client.phone).history.map(h => (
+                                                                    {getClientHistory(client.phone, client.client_name, client.treatment).history.map(h => (
                                                                         <TableRow key={h.id}>
                                                                             <TableCell className="text-xs py-2">{format(parseISO(h.completed_at), 'dd/MM/yy')}</TableCell>
                                                                             <TableCell className="text-xs py-2 truncate max-w-[120px]">{h.treatment}</TableCell>
@@ -474,15 +474,28 @@ const Rendezvous = () => {
                                                         </div>
                                                     </div>
 
+                                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex justify-between items-center">
+                                                        <div>
+                                                            <p className="text-[10px] uppercase font-bold text-emerald-600">Total payé pour ce traitement</p>
+                                                            <p className="text-2xl font-black text-emerald-700">
+                                                                {(client as any).totalPaid?.toLocaleString()} DZD
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-[10px] uppercase font-bold text-emerald-600">Montant total</p>
+                                                            <p className="text-lg font-bold text-emerald-800">{client.total_amount?.toLocaleString()} DZD</p>
+                                                        </div>
+                                                    </div>
+
                                                     <div className="space-y-4">
                                                         <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                                                             <CalendarIcon className="h-3.5 w-3.5" /> Historique des Rendez-vous
                                                         </h4>
                                                         <div className="space-y-2">
-                                                            {getClientHistory(client.phone).appts.length === 0 ? (
+                                                            {getClientHistory(client.phone, client.client_name, client.treatment).appts.length === 0 ? (
                                                                 <p className="text-sm text-center py-4 bg-muted/20 rounded-xl text-muted-foreground">Aucun historique de rendez-vous</p>
                                                             ) : (
-                                                                getClientHistory(client.phone).appts.map(a => (
+                                                                getClientHistory(client.phone, client.client_name, client.treatment).appts.map(a => (
                                                                     <div key={a.id} className="flex items-center justify-between p-3 rounded-xl border text-sm">
                                                                         <div>
                                                                             <p className="font-semibold">{format(parseISO(a.appointment_at), 'PPp', { locale: fr })}</p>

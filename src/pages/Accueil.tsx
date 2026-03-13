@@ -10,13 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Phone, Plus, LogOut, ChevronRight, ChevronLeft, Users, Clock, CheckCircle, XCircle, MessageCircle, Pencil, Trash2, UserCheck, Calendar } from 'lucide-react';
+import { Phone, Plus, LogOut, ChevronRight, ChevronLeft, Users, Clock, CheckCircle, XCircle, MessageCircle, Pencil, Trash2, UserCheck, Calendar as CalendarIcon } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
 
 const TREATMENTS = ['Consultation', 'Blanchiment', 'Extraction', 'Détartrage', 'Soin dentaire', 'Prothèse', 'Orthodontie'];
 
 const Accueil = () => {
   const { user, signOut } = useAuth();
-  const { entries, inCabinetEntries, activeSession, doctors, openSession, closeSession, addClient, callClient, completeClient, getStats, updateClient, deleteClient } = useQueue();
+  const { entries, inCabinetEntries, activeSession, doctors, loading, openSession, closeSession, addClient, callClient, completeClient, getStats, updateClient, deleteClient } = useQueue();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -47,6 +53,7 @@ const Accueil = () => {
   const [newState, setNewState] = useState<'U' | 'N' | 'R'>('N');
   const [newDoctorId, setNewDoctorId] = useState('');
   const [linkedAppointmentId, setLinkedAppointmentId] = useState<string | null>(null);
+  const [foundAppointments, setFoundAppointments] = useState<any[]>([]);
 
   // Complete form
   const [clientName, setClientName] = useState('');
@@ -56,6 +63,13 @@ const Accueil = () => {
   const [totalPaidPreviously, setTotalPaidPreviously] = useState(0);
 
   const [completedClients, setCompletedClients] = useState<any[]>([]);
+
+  // Next appointment form
+  const [hasNextAppt, setHasNextAppt] = useState(false);
+  const [nextApptDate, setNextApptDate] = useState<Date | undefined>(undefined);
+  const [nextApptTime, setNextApptTime] = useState('09:00');
+  const [nextApptDoctorId, setNextApptDoctorId] = useState('');
+
 
   // Memoize statistics to avoid recalculating on every render
   const stats = useMemo(() => getStats(), [entries, inCabinetEntries, getStats]);
@@ -70,6 +84,7 @@ const Accueil = () => {
       };
     });
   }, [doctors, entries]);
+
 
   const handleOpenSession = async () => {
     if (!user) return;
@@ -120,7 +135,7 @@ const Accueil = () => {
 
   // Search for appointment when phone or state changes
   React.useEffect(() => {
-    const searchAppointment = async () => {
+    const searchAppointments = async () => {
       if (newState === 'R' && newPhone.length >= 8) {
         const today = new Date();
         const start = new Date(today.setHours(0, 0, 0, 0)).toISOString();
@@ -131,22 +146,28 @@ const Accueil = () => {
           .select('id, client_name, doctor_id')
           .eq('client_phone', newPhone.trim())
           .gte('appointment_at', start)
-          .lte('appointment_at', end)
-          .maybeSingle();
+          .lte('appointment_at', end);
 
-        if (data) {
-          setNewPatientName(data.client_name);
-          setNewDoctorId(data.doctor_id);
-          setLinkedAppointmentId(data.id);
-          toast.info(`Rendez-vous trouvé pour ${data.client_name}`);
+        if (data && data.length > 0) {
+          setFoundAppointments(data);
+          if (data.length === 1) {
+            setNewPatientName(data[0].client_name);
+            setNewDoctorId(data[0].doctor_id);
+            setLinkedAppointmentId(data[0].id);
+            toast.info(`Rendez-vous trouvé pour ${data[0].client_name}`);
+          } else {
+            toast.info(`${data.length} rendez-vous trouvés pour ce numéro. Veuillez choisir.`);
+          }
         } else {
+          setFoundAppointments([]);
           setLinkedAppointmentId(null);
         }
-      } else if (newState !== 'R') {
-        setLinkedAppointmentId(null);
+      } else {
+        setFoundAppointments([]);
+        if (newState !== 'R') setLinkedAppointmentId(null);
       }
     };
-    searchAppointment();
+    searchAppointments();
   }, [newPhone, newState]);
 
   const handleNext = async (entry: QueueEntry) => {
@@ -195,7 +216,12 @@ const Accueil = () => {
       setTranchePaid('');
     }
 
+    setHasNextAppt(false);
+    setNextApptDate(undefined);
+    setNextApptTime('09:00');
+    setNextApptDoctorId(entry.doctor_id);
     setShowCompleteModal(true);
+
   };
 
   const handleComplete = async () => {
@@ -213,9 +239,28 @@ const Accueil = () => {
     );
     if (error) toast.error('Erreur');
     else {
+      if (hasNextAppt && nextApptDate) {
+        const [hours, minutes] = nextApptTime.split(':');
+        const appointmentAt = new Date(nextApptDate);
+        appointmentAt.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+        await (await import('@/integrations/supabase/client')).supabase
+          .from('appointments')
+          .insert({
+            client_phone: selectedEntry.phone,
+            client_name: clientName.trim(),
+            doctor_id: nextApptDoctorId,
+            appointment_at: appointmentAt.toISOString(),
+            status: 'scheduled'
+          });
+
+        toast.success('Rendez-vous programmé');
+      }
+
       toast.success('Patient traité avec succès');
       setShowCompleteModal(false);
     }
+
   };
 
   const handleEdit = (entry: QueueEntry) => {
@@ -277,6 +322,17 @@ const Accueil = () => {
 
   const stateLabels = { U: 'Urgence', N: 'Nouveau', R: 'Rendez-vous' };
 
+  if (loading) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Chargement de la séance...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activeSession) {
     return (
       <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -318,13 +374,14 @@ const Accueil = () => {
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Link to="/rendezvous">
             <Button variant="outline" size="sm" className="hidden sm:flex">
-              <Calendar className="h-4 w-4 mr-1" /> Rendez-vous
+              <CalendarIcon className="h-4 w-4 mr-1" /> Rendez-vous
             </Button>
           </Link>
           <Link to="/rendezvous">
             <Button variant="outline" size="icon" className="sm:hidden h-8 w-8">
-              <Calendar className="h-4 w-4" />
+              <CalendarIcon className="h-4 w-4" />
             </Button>
+
           </Link>
           <Button variant="outline" size="sm" onClick={fetchCompleted} className="hidden sm:flex">
             <CheckCircle className="h-4 w-4 mr-1" /> Terminés
@@ -560,8 +617,9 @@ const Accueil = () => {
             />
             {linkedAppointmentId && (
               <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 py-1.5 flex items-center gap-1.5">
-                <Calendar className="h-3 w-3" /> Rendez-vous lié
+                <CalendarIcon className="h-3 w-3" /> Rendez-vous lié
               </Badge>
+
             )}
             <Input
               placeholder="Numéro de téléphone"
@@ -578,6 +636,32 @@ const Accueil = () => {
                 <SelectItem value="R">🔵 Rendez-vous</SelectItem>
               </SelectContent>
             </Select>
+
+            {foundAppointments.length > 1 && (
+              <div className="space-y-2 p-3 bg-blue-50 border border-blue-100 rounded-lg animate-in fade-in slide-in-from-top-2">
+                <p className="text-[10px] font-bold uppercase text-blue-600">Plusieurs rendez-vous trouvés :</p>
+                <div className="flex flex-col gap-1.5">
+                  {foundAppointments.map((appt) => (
+                    <Button
+                      key={appt.id}
+                      variant={linkedAppointmentId === appt.id ? "default" : "outline"}
+                      size="sm"
+                      className="justify-start h-auto py-2 text-left"
+                      onClick={() => {
+                        setNewPatientName(appt.client_name);
+                        setNewDoctorId(appt.doctor_id);
+                        setLinkedAppointmentId(appt.id);
+                      }}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold truncate">{appt.client_name}</p>
+                        <p className="text-[10px] opacity-70">Dr. {doctors.find(d => d.id === appt.doctor_id)?.name || '...'}</p>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <Select value={newDoctorId} onValueChange={setNewDoctorId}>
               <SelectTrigger className="h-11 sm:h-12"><SelectValue placeholder="Médecin" /></SelectTrigger>
               <SelectContent>
@@ -634,6 +718,57 @@ const Accueil = () => {
               type="number"
               className="h-11 sm:h-12"
             />
+
+            <div className="flex items-center space-x-2 py-2">
+              <Checkbox
+                id="next-appt"
+                checked={hasNextAppt}
+                onCheckedChange={(checked) => setHasNextAppt(checked === true)}
+              />
+              <label
+                htmlFor="next-appt"
+                className="text-sm font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Prendre un rendez-vous ?
+              </label>
+            </div>
+
+            {hasNextAppt && (
+              <div className="space-y-3 p-3 bg-secondary/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal h-10 px-3">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {nextApptDate ? format(nextApptDate, 'dd/MM/yy', { locale: fr }) : <span>Choisir...</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={nextApptDate} onSelect={setNextApptDate} locale={fr} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Heure</label>
+                    <Input type="time" value={nextApptTime} onChange={(e) => setNextApptTime(e.target.value)} className="h-10" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground">Médecin</label>
+                  <Select value={nextApptDoctorId} onValueChange={setNextApptDoctorId}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Médecin" /></SelectTrigger>
+                    <SelectContent>
+                      {doctors.map(d => (
+                        <SelectItem key={d.id} value={d.id}>Dr. {d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
           </div>
           <DialogFooter>
             <Button onClick={handleComplete} className="w-full h-11 sm:h-12">Confirmer</Button>
@@ -715,7 +850,7 @@ const Accueil = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 
