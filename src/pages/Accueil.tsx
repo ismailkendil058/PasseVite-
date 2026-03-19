@@ -262,10 +262,13 @@ const Accueil = () => {
         toast.success('Rendez-vous programmé');
       }
 
-      toast.success('Patient traité avec succès');
+      // Send satisfaction SMS
+      toast.info('Envoi du SMS de satisfaction...');
+      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ? Répondez ici : https://passevite.vercel.app/satisfaction?phone=${selectedEntry!.phone}`;
+      window.open(`sms:${selectedEntry!.phone}?body=${encodeURIComponent(satisfactionMessage)}`, '_blank');
+      toast.success('Patient traité avec succès - SMS envoyé');
       setShowCompleteModal(false);
     }
-
   };
 
   const handleEdit = (entry: QueueEntry) => {
