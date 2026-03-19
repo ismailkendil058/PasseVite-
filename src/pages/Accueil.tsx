@@ -263,9 +263,7 @@ const Accueil = () => {
       }
 
       // Send satisfaction SMS
-      toast.info('Envoi du SMS de satisfaction...');
-      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ? Répondez ici : https://passevite.vercel.app/satisfaction?phone=${selectedEntry!.phone}`;
-      window.open(`sms:${selectedEntry!.phone}?body=${encodeURIComponent(satisfactionMessage)}`, '_blank');
+      toast.info('Envoi du SMS de satisfaction...');\n      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement \"${treatment}\" chez PasseVite ? Répondez ici : https://passevite.vercel.app?phone=${selectedEntry!.phone}`;\n      window.open(`sms:${selectedEntry!.phone}?body=${encodeURIComponent(satisfactionMessage)}`, '_blank');
       toast.success('Patient traité avec succès - SMS envoyé');
       setShowCompleteModal(false);
     }
