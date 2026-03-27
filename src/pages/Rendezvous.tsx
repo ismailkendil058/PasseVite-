@@ -535,93 +535,10 @@ const Rendezvous = () => {
                     </TabsContent>
 
                     <TabsContent value="calendar" className="mt-6 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
-                            <Card className="border-none shadow-premium overflow-hidden">
-                                <CardContent className="p-0">
-                                    <div className="p-6 border-b bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                        <div>
-                                            <h3 className="font-black italic text-xl text-primary">Vue Docteurs</h3>
-                                            <p className="text-xs text-muted-foreground">Gestion d'agenda globale</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" className="h-9 px-3 text-xs" onClick={() => setNewApptDate(new Date())}>Aujourd'hui</Button>
-                                            <Button className="h-9 px-3 text-xs gap-2" onClick={() => {
-                                                setSelectedClient(null);
-                                                setIsScheduleOpen(true);
-                                            }}>
-                                                <Plus className="h-4 w-4" /> Nouveau RDV
-                                            </Button>
-                                        </div>
-                                        <div className="px-6 pb-4 sm:hidden">
-                                            <Select value={selectedDoctorMobile} onValueChange={setSelectedDoctorMobile}>
-                                                <SelectTrigger className="w-full h-11 rounded-xl">
-                                                    <SelectValue placeholder="Choisir un médecin" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {doctors.map(d => (
-                                                        <SelectItem key={d.id} value={d.id}>Dr. {d.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-2 sm:p-4">
-                                        <ScrollArea className="h-[600px]">
-                                            <div className="grid grid-cols-[80px_1fr] gap-4">
-                                                {/* Time labels */}
-                                                <div className="space-y-[80px] pt-10 text-[10px] font-black text-muted-foreground/60 text-right pr-2">
-                                                    {['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(t => (
-                                                        <div key={t} className="h-0 flex items-center justify-end">{t}</div>
-                                                    ))}
-                                                </div>
-
-                                                {/* Grid Columns for Doctors */}
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:min-w-[600px]">
-                                                    {doctors
-                                                        .filter(d => selectedDoctorMobile === 'all' || d.id === selectedDoctorMobile)
-                                                        .map(doctor => (
-                                                            <div key={doctor.id} className="relative bg-muted/10 rounded-xl min-h-[1000px] border border-muted-foreground/10">
-                                                                <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-sm p-3 border-b text-center font-bold text-sm text-primary">
-                                                                    {doctor.name}
-                                                                </div>
-
-                                                                {/* Appointments for this doctor on selected current day (for simplicity current today view) */}
-                                                                {parsedAppointments
-                                                                    .filter(a => a.status !== 'denied' && a.doctor_id === doctor.id && a.startOfDayTime === startOfDay(newApptDate || new Date()).getTime())
-                                                                    .map(appt => {
-                                                                        const date = parseISO(appt.appointment_at);
-                                                                        const hours = date.getHours();
-                                                                        const minutes = date.getMinutes();
-                                                                        const offset = (hours - 8) * 80 + (minutes / 60) * 80 + 50; // Simple positioning logic
-
-                                                                        return (
-                                                                            <div
-                                                                                key={appt.id}
-                                                                                className={`absolute left-1 right-1 bg-white dark:bg-slate-900 border-l-4 shadow-lg p-2 rounded-lg cursor-pointer hover:scale-[1.02] transition-transform z-20 group ${appt.status === 'coming' ? 'border-l-emerald-500 ring-1 ring-emerald-100' :
-                                                                                    appt.status === 'denied' ? 'border-l-rose-500 ring-1 ring-rose-100' :
-                                                                                        'border-l-primary'
-                                                                                    }`}
-                                                                                style={{ top: `${offset}px`, height: '70px' }}
-                                                                            >
-                                                                                <p className={`text-[10px] font-black ${appt.status === 'coming' ? 'text-emerald-600' : appt.status === 'denied' ? 'text-rose-600' : 'text-primary'}`}>{format(date, 'HH:mm')}</p>
-                                                                                <p className="text-[11px] font-bold text-foreground leading-tight truncate">{appt.client_name}</p>
-                                                                                <p className={`text-[9px] truncate uppercase font-bold ${appt.status === 'coming' ? 'text-emerald-600' : appt.status === 'denied' ? 'text-rose-600' : 'text-muted-foreground'}`}>{appt.status}</p>
-                                                                            </div>
-                                                                        );
-                                                                    })
-                                                                }
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </div>
-                                        </ScrollArea>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <div className="space-y-6">
-                                <Card className="border-none shadow-premium">
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            {/* Date Selector & Summary - Above on Mobile, Right on Desktop */}
+                            <div className="w-full lg:w-[300px] space-y-6 lg:order-2 shrink-0">
+                                <Card className="border-none shadow-premium overflow-hidden">
                                     <CardHeader className="p-4 pb-2">
                                         <CardTitle className="text-sm font-bold truncate">Sélecteur de Date</CardTitle>
                                     </CardHeader>
@@ -650,6 +567,144 @@ const Rendezvous = () => {
                                     </div>
                                 </Card>
                             </div>
+
+                            {/* Main Calendar View */}
+                            <Card className="flex-1 border-none shadow-premium overflow-hidden lg:order-1 min-w-0">
+                                <CardContent className="p-0">
+                                    <div className="p-6 border-b bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="font-black italic text-xl text-primary">Vue Docteurs</h3>
+                                            <p className="text-xs text-muted-foreground">Gestion d'agenda globale</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" className="h-9 px-3 text-xs" onClick={() => setNewApptDate(new Date())}>Aujourd'hui</Button>
+                                            <Button className="h-9 px-3 text-xs gap-2" onClick={() => {
+                                                setSelectedClient(null);
+                                                setIsScheduleOpen(true);
+                                            }}>
+                                                <Plus className="h-4 w-4" /> Nouveau RDV
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile Doctor Switcher (Pills) */}
+                                    <div className="px-6 pb-4 sm:hidden flex overflow-scroll no-scrollbar gap-2">
+                                        {doctors.map(d => (
+                                            <button
+                                                key={d.id}
+                                                onClick={() => setSelectedDoctorMobile(d.id)}
+                                                className={`
+                                                    px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap
+                                                    ${selectedDoctorMobile === d.id
+                                                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105'
+                                                        : 'bg-muted text-muted-foreground hover:bg-muted/80'}
+                                                `}
+                                            >
+                                                Dr. {d.name}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="p-0 sm:p-2">
+                                        <ScrollArea className="h-[650px] sm:h-[600px] px-2 sm:px-4">
+                                            <div className="relative min-h-[1050px] min-w-0">
+
+                                                {/* Time Background Grid Lines */}
+                                                <div className="absolute inset-0 pt-10 pointer-events-none">
+                                                    {['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map((t, idx) => (
+                                                        <div
+                                                            key={t}
+                                                            className="absolute left-0 w-full border-t border-muted/30 flex items-start"
+                                                            style={{ top: `${idx * 80 + 50}px` }}
+                                                        >
+                                                            <span className="text-[9px] font-black text-muted-foreground/30 -mt-2.5 bg-background pr-2 z-10 uppercase tracking-tighter">
+                                                                {t}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Current Time Indicator */}
+                                                {newApptDate && format(newApptDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') && (
+                                                    <div
+                                                        className="absolute left-0 right-0 border-t-2 border-rose-500/50 z-30 pointer-events-none flex items-center"
+                                                        style={{
+                                                            top: `${(new Date().getHours() - 8) * 80 + (new Date().getMinutes() / 60) * 80 + 50}px`,
+                                                            transition: 'top 60s linear'
+                                                        }}
+                                                    >
+                                                        <div className="w-2 h-2 rounded-full bg-rose-500 -ml-1 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+                                                        <div className="ml-2 px-1.5 py-0.5 rounded bg-rose-500 text-[8px] font-black text-white uppercase tracking-widest shadow-lg">Maintenant</div>
+                                                    </div>
+                                                )}
+
+                                                {/* Doctor Columns */}
+                                                <div className={`ml-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-full ${selectedDoctorMobile === 'all' ? 'min-w-[700px] sm:min-w-0' : ''}`}>
+                                                    {doctors
+                                                        .filter(d => selectedDoctorMobile === 'all' || d.id === selectedDoctorMobile)
+                                                        .map(doctor => (
+                                                            <div key={doctor.id} className="relative min-h-[1000px] rounded-2xl bg-muted/5 border border-primary/5 overflow-hidden group/col">
+                                                                {/* Column Sticky Header */}
+                                                                <div className="sticky top-0 z-10 bg-white/80 dark:bg-black/40 backdrop-blur-md p-3 border-b border-primary/5 text-center group-hover/col:bg-primary/5 transition-colors">
+                                                                    <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] mb-0.5 opacity-60">Cabinet</p>
+                                                                    <p className="font-black text-sm text-foreground italic flex items-center justify-center gap-2">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                                        Dr. {doctor.name}
+                                                                    </p>
+                                                                </div>
+
+                                                                {/* Appointments for this doctor */}
+                                                                <div className="relative h-full pt-10">
+                                                                    {parsedAppointments
+                                                                        .filter(a => a.status !== 'denied' && a.doctor_id === doctor.id && a.startOfDayTime === startOfDay(newApptDate || new Date()).getTime())
+                                                                        .map(appt => {
+                                                                            const date = parseISO(appt.appointment_at);
+                                                                            const hours = date.getHours();
+                                                                            const minutes = date.getMinutes();
+                                                                            const offset = (hours - 8) * 80 + (minutes / 60) * 80;
+
+                                                                            return (
+                                                                                <div
+                                                                                    key={appt.id}
+                                                                                    className={`
+                                                                                        absolute left-2 right-2 p-3 rounded-2xl border-l-[6px] 
+                                                                                        shadow-xl shadow-primary/5 transition-all duration-300 
+                                                                                        hover:scale-[1.02] active:scale-95 z-20 cursor-pointer group
+                                                                                        bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-primary/5
+                                                                                        ${appt.status === 'coming' ? 'border-l-emerald-500 shadow-emerald-500/10' :
+                                                                                            appt.status === 'denied' ? 'border-l-rose-500 shadow-rose-500/10' :
+                                                                                                appt.status === 'attended' ? 'border-l-blue-500 shadow-blue-500/10 opacity-75' :
+                                                                                                    'border-l-primary shadow-primary/10'}
+                                                                                    `}
+                                                                                    style={{ top: `${offset}px`, height: '75px' }}
+                                                                                    onClick={() => openEditModal(appt)}
+                                                                                >
+                                                                                    <div className="flex justify-between items-start mb-1">
+                                                                                        <span className={`text-[11px] font-black tracking-tighter italic ${appt.status === 'coming' ? 'text-emerald-600' : appt.status === 'denied' ? 'text-rose-600' : 'text-primary'}`}>
+                                                                                            {format(date, 'HH:mm')}
+                                                                                        </span>
+                                                                                        <div className={`w-1.5 h-1.5 rounded-full ${appt.status === 'coming' ? 'bg-emerald-500 animate-pulse' : 'bg-primary/20'}`} />
+                                                                                    </div>
+                                                                                    <p className="text-xs font-black text-foreground truncate uppercase tracking-tight">
+                                                                                        {appt.client_name}
+                                                                                    </p>
+                                                                                    <p className="text-[9px] text-muted-foreground font-bold mt-0.5 truncate flex items-center gap-1">
+                                                                                        <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                                                                                        {appt.notes || 'Sans note'}
+                                                                                    </p>
+                                                                                </div>
+                                                                            );
+                                                                        })
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        </ScrollArea>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </div>
                     </TabsContent>
                 </Tabs>
