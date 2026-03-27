@@ -1,0 +1,16 @@
+{
+    "name": "PasseVite",
+    "short_name": "PasseVite",
+    "description": "Votre avis aide notre clinique à améliorer la qualité des soins.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
+    "icons": [
+        {
+            "src": "/VitalWeb.png",
+            "sizes": "192x192 512x512",
+            "type": "image/png"
+        }
+    ]
+}
