@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import DynamicManifest from "./components/DynamicManifest";
 
 // Lazy load pages for better performance
 import Index from "./pages/Index";
@@ -56,6 +57,7 @@ const App = () => (
     <Toaster />
     <Sonner />
     <BrowserRouter>
+      <DynamicManifest />
       <AuthProvider>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
