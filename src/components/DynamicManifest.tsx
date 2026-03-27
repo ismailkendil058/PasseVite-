@@ -12,15 +12,15 @@ export default function DynamicManifest() {
         if (location.pathname.startsWith('/manager')) {
             manifestUrl = '/manifest-manager.json';
             appleIconUrl = '/apple-touch-icon-manager.png';
-            title = 'PV Manager';
+            title = 'PV manager';
         } else if (location.pathname.startsWith('/accueil')) {
             manifestUrl = '/manifest-accueil.json';
             appleIconUrl = '/apple-touch-icon.png';
-            title = 'PV Accueil';
+            title = 'PV accueil';
         } else if (location.pathname.startsWith('/doctor')) {
             manifestUrl = '/manifest-medecin.json';
             appleIconUrl = '/apple-touch-icon.png';
-            title = 'PV Médecin';
+            title = 'PV doctor';
         }
 
         // Update manifest

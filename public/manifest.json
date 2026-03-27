@@ -21,8 +21,8 @@
     ],
     "shortcuts": [
         {
-            "name": "Espace Médecin",
-            "short_name": "Médecin",
+            "name": "PV doctor",
+            "short_name": "doctor",
             "description": "Accès rapide au tableau de bord médecin",
             "url": "/doctor/login",
             "icons": [
@@ -34,10 +34,23 @@
             ]
         },
         {
-            "name": "Espace Manager",
-            "short_name": "Manager",
+            "name": "PV accueil",
+            "short_name": "accueil",
+            "description": "Accès rapide au portail de réception",
+            "url": "/accueil/login",
+            "icons": [
+                {
+                    "src": "/VitalWeb.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
+        },
+        {
+            "name": "PV manager",
+            "short_name": "manager",
             "description": "Accès rapide au portail de gestion",
-            "url": "/manager",
+            "url": "/manager/login",
             "icons": [
                 {
                     "src": "/VitalWeb.png",

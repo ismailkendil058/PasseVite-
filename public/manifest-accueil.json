@@ -1,6 +1,6 @@
 {
-    "name": "PasseVite Accueil",
-    "short_name": "PV Accueil",
+    "name": "PV accueil",
+    "short_name": "accueil",
     "description": "Interface d'accueil PasseVite.",
     "start_url": "/accueil/login",
     "scope": "/",
