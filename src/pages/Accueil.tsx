@@ -263,7 +263,7 @@ const Accueil = () => {
       }
 
       // Open SMS app for satisfaction feedback
-      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ?\n\nLaissez-nous votre avis ici : https://passevite-solo.vercel.app/review?phone=${selectedEntry!.phone}`;
+      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ?\n\nLaissez-nous votre avis ici : https://passevite.vercel.app/review?phone=${selectedEntry!.phone}`;
 
       // Handle iOS/Android URI differences
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
