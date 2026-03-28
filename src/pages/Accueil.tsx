@@ -164,8 +164,8 @@ const Accueil = () => {
             setLinkedAppointmentId(null);
           }
         } else {
-            setFoundAppointments([]);
-            if (newState !== 'R') setLinkedAppointmentId(null);
+          setFoundAppointments([]);
+          if (newState !== 'R') setLinkedAppointmentId(null);
         }
       };
 
@@ -262,11 +262,25 @@ const Accueil = () => {
         toast.success('Rendez-vous programmé');
       }
 
-      // Send satisfaction SMS
-      toast.info('Envoi du SMS de satisfaction...');
-      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ? Répondez ici : https://passevite.vercel.app?phone=${selectedEntry!.phone}`;
-      window.open(`sms:${selectedEntry!.phone}?body=${encodeURIComponent(satisfactionMessage)}`, '_blank');
-      toast.success('Patient traité avec succès - SMS envoyé');
+      // Open SMS app for satisfaction feedback
+      const satisfactionMessage = `Bonjour ${clientName}, avez-vous aimé votre traitement "${treatment}" chez PasseVite ?\n\nLaissez-nous votre avis ici : https://passevite-solo.vercel.app/review?phone=${selectedEntry!.phone}`;
+
+      // Handle iOS/Android URI differences
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const smsLink = `sms:${selectedEntry!.phone}${isIOS ? '&' : '?'}body=${encodeURIComponent(satisfactionMessage)}`;
+
+      toast.success('Patient traité avec succès', {
+        description: "Ouverture de l'application SMS pour le questionnaire...",
+        duration: 5000,
+        action: {
+          label: "Envoyer SMS",
+          onClick: () => { window.location.href = smsLink; }
+        }
+      });
+
+      // Attempt automatic redirect
+      window.location.href = smsLink;
+
       setShowCompleteModal(false);
     }
   };
